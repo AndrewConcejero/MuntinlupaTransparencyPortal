@@ -20,6 +20,7 @@ export default defineConfig({
     name: 'Andrew Concejero and Alexander Concejero, citizen volunteers (not the city government)',
     url: 'https://github.com/AndrewConcejero/MuntinlupaTransparencyPortal',
   },
+  siteUrl: 'https://muntinlupa-transparency-portal-lovat.vercel.app',
   scope: {
     offices: ['Las Piñas Muntinlupa District Engineering Office'],
     places: [{ label: 'Muntinlupa', region: 'NCR' }],
