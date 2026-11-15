@@ -16,21 +16,29 @@ export default defineConfig({
   name: 'Muntinlupa City',
   shortName: 'Muntinlupa',
   // A citizen project. It is not run by the city government.
-  operator: { name: 'citizen volunteers, not the city government', url: 'https://github.com/AndrewConcejero/MuntinlupaTransparencyPortal' },
+  operator: {
+    name: 'Andrew Concejero and Alexander Concejero, citizen volunteers (not the city government)',
+    url: 'https://github.com/AndrewConcejero/MuntinlupaTransparencyPortal',
+  },
   scope: {
     offices: ['Las Piñas Muntinlupa District Engineering Office'],
     places: [{ label: 'Muntinlupa', region: 'NCR' }],
     // Muntinlupa's nine barangays. A project is listed under each one its title names.
+    // The other names are subdivisions and landmarks, mapped to their barangay
+    // by hand: a first guess, to be checked by people who live there.
     barangays: [
-      { name: 'Alabang' },
-      { name: 'Ayala Alabang', aliases: ['New Alabang Village', 'New Alabang'] },
-      { name: 'Bayanan' },
+      { name: 'Alabang', aliases: ['Ospital ng Muntinlupa', 'Filinvest', 'Pedro E. Diaz'] },
+      { name: 'Ayala Alabang', aliases: ['New Alabang Village', 'New Alabang', 'Madrigal Business Park', 'Alabang Town Center'] },
+      { name: 'Bayanan', aliases: ['Pleasant Village'] },
       { name: 'Buli' },
-      { name: 'Cupang' },
-      { name: 'Poblacion' },
-      { name: 'Putatan' },
-      { name: 'Sucat' },
-      { name: 'Tunasan' },
+      { name: 'Cupang', aliases: ['Alabang Hills', 'Hillsborough', 'Liberty Homes', 'Intercity Homes'] },
+      {
+        name: 'Poblacion',
+        aliases: ['New Bilibid Prison', 'Bilibid', 'NBP', 'MaxSeCom', 'Maximum Security Compound', 'Medium Security Compound', 'Minimum Security Compound', 'Katarungan Village', 'Southville 3'],
+      },
+      { name: 'Putatan', aliases: ['Soldiers Hills', "Soldiers' Hills", 'Lakeview Homes', 'Bruger', 'Treelane Park', 'Summitville'] },
+      { name: 'Sucat', aliases: ['Posadas Village', "Sucat People's Park"] },
+      { name: 'Tunasan', aliases: ['Victoria Homes', 'Villa Carolina', 'Susana Heights', 'Muntinlupa City Jail', 'Muntinlupa Sports Complex'] },
     ],
     // The DPWH office is shared with Las Piñas; its projects there are grouped apart.
     // ("Las Pias" catches the ñ some older documents lost.)

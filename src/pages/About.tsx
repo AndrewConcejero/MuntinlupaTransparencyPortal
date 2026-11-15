@@ -98,6 +98,7 @@ function AboutView({ scope, overview }: { scope: ScopeResult; overview: Overview
             school named after one. It looks for {config.scope.barangays!.map((b) => [b.name, ...(b.aliases ?? [])].join(' or ')).join(', ')}.
           </p>
           <p className="fine">
+            Subdivisions and landmarks are matched to a barangay by the people who run this portal; tell us if one is wrong.
             This is a reading of the name, not a survey of the site. A name inside a road between two places
             (“Zapote-Alabang Rd”) does not count, and a project that names no barangay is never guessed into one.
             {(config.scope.neighbours?.length ?? 0) > 0 && (

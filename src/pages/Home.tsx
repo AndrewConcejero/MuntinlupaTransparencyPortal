@@ -8,12 +8,12 @@ import { PageHead } from '../components/Chrome';
 import OfficesSection from '../components/OfficesSection';
 import { areaKeys, areaReader, neighbourKey, NO_BARANGAY, type Area } from '../lib/areas';
 import { projectsCsv, downloadText } from '../lib/csv';
-import { count, php, phpDelta, plural } from '../lib/format';
+import { count, php, phpDelta, phpFull, plural } from '../lib/format';
 import { usePortal } from '../lib/portal-context';
 import { summarise, type ScopedProject, type ScopeResult, type Summary } from '../lib/scope';
 import { useTitle } from '../lib/use-title';
 
-const PAGE = 100;
+const PAGE = 25;
 
 type Sort = 'house' | 'nep' | 'change' | 'title';
 const SORTS: Record<Sort, { label: string; cmp: (a: ScopedProject, b: ScopedProject) => number }> = {
@@ -74,6 +74,13 @@ function Projects({ scope, datasets }: { scope: ScopeResult; datasets: DatasetIn
     return new Map(all.map((p) => [p.key, read(p.title)]));
   }, [all, config]);
   const areaTiles = useMemo(() => tilesOf(config, all, areas), [config, all, areas]);
+  // Barangays as a ranked bar chart: largest House bill amount first, those with nothing named last.
+  const barangayBars = useMemo(
+    () => areaTiles.filter((t) => t.kind === 'barangay').sort((x, y) => y.house_php - x.house_php || y.rows - x.rows || x.label.localeCompare(y.label)),
+    [areaTiles],
+  );
+  const barMax = Math.max(1, ...barangayBars.map((t) => t.house_php));
+  const whereParts = useMemo(() => whereOf(all, areas, areaTiles), [all, areas, areaTiles]);
   const programName = (k: DatasetKey) => datasets.find((d) => d.key === k)?.short ?? k.toUpperCase();
 
   const [params, setParams] = useSearchParams();
@@ -92,6 +99,11 @@ function Projects({ scope, datasets }: { scope: ScopeResult; datasets: DatasetIn
     else next.delete(key);
     setParams(next, { replace: true });
     setShown(PAGE);
+  };
+
+  const pickArea = (key: string) => {
+    setParam('area', key);
+    if (key) document.getElementById('projects')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   };
 
   // DPWH offices among the rows, largest first, for the Office filter.
@@ -131,54 +143,75 @@ function Projects({ scope, datasets }: { scope: ScopeResult; datasets: DatasetIn
       <PageHead
         eyebrow={<>FY 2027<span className="sep">·</span>NEP and House Bill 10858<span className="sep">·</span>{name}</>}
         title={`${plural(summary.rows, 'project')} for ${name} in the 2027 budget`}
-      >
-        <Lede summary={summary} shared={areaTiles.filter((t) => t.kind === 'neighbour')} name={name} />
-      </PageHead>
+      />
 
-      <Stats summary={summary} programName={programName} />
+      <Hero summary={summary} />
 
       {areaTiles.length > 0 && (
         <section className="section" id="barangays" aria-labelledby="areas-h">
           <h2 id="areas-h" className="section-h">Find your barangay</h2>
-          <div className="areas" role="group" aria-label="Filter by barangay">
-            {areaTiles.map((t) => {
+          <p className="chart-sub">House bill amount of the projects that name each barangay. Tap one to see its projects.</p>
+          <div className="rank" role="group" aria-label="Filter by barangay">
+            {barangayBars.map((t) => {
               const active = area === t.key;
               return (
                 <button
                   key={t.key}
                   type="button"
-                  className={`area-tile area-${t.kind}${active ? ' active' : ''}`}
+                  className={`rk-row${active ? ' active' : ''}${area && !active ? ' dim' : ''}`}
                   disabled={!t.rows}
                   aria-pressed={active}
-                  onClick={() => {
-                    setParam('area', active ? '' : t.key);
-                    if (!active) document.getElementById('projects')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-                  }}
+                  title={t.rows ? `${t.label}: ${phpFull(t.house_php)} in the House bill, ${plural(t.rows, 'project')}` : `No 2027 project names ${t.label}`}
+                  onClick={() => pickArea(active ? '' : t.key)}
                 >
-                  <span className="area-name">{t.label}</span>
-                  <span className="area-count num">{t.rows ? plural(t.rows, 'project') : 'None named'}</span>
-                  {t.kind === 'barangay' && (
-                    <span className="area-bar" aria-hidden="true"><span style={{ width: `${(t.house_php / areaMax(areaTiles)) * 100}%` }} /></span>
-                  )}
-                  <span className="area-php num">{t.rows ? `${php(t.house_php)} in the House bill` : '—'}</span>
+                  <span className="rk-name">{t.label}</span>
+                  <span className="rk-track" aria-hidden="true">
+                    {t.rows > 0 && <span className="rk-fill" style={{ width: `${(t.house_php / barMax) * 100}%` }} />}
+                  </span>
+                  <span className="rk-value num">{t.rows ? php(t.house_php) : '—'}</span>
+                  <span className="rk-count">{t.rows ? plural(t.rows, 'project') : 'none named'}</span>
                 </button>
               );
             })}
           </div>
+
+          <h3 className="chart-h">Where the {count(summary.rows)} projects are</h3>
+          <Segments
+            label={`Where the ${count(summary.rows)} projects are`}
+            parts={whereParts.map((w) => ({
+              key: w.key,
+              label: w.label,
+              value: w.rows,
+              detail: `${plural(w.rows, 'project')} · ${php(w.house_php)} in the House bill`,
+              className: `seg-${w.kind}`,
+              active: w.key ? area === w.key : false,
+              onClick: w.key ? () => pickArea(area === w.key ? '' : w.key) : undefined,
+            }))}
+          />
           <p className="fine">
-            The budget documents do not say which barangay a project is in, so this reads it from the project’s name. A
-            project that names two barangays is counted in both, so the tiles do not add up to the total. One that names
-            none (a river, a national road) is under “No barangay named”.
+            The documents give no barangay, so it is read from each project’s name; a project that names two counts in both.{' '}
+            <Link to="/about">How this works</Link>
           </p>
         </section>
       )}
 
-      <OfficesSection />
-
       <section className="section" aria-labelledby="groups-h">
         <h2 id="groups-h" className="section-h">What the House bill did to them</h2>
+        <Segments
+          label="Projects by what the House bill did to them"
+          parts={BRIDGE_GROUPS.filter((g) => summary.groups[g].rows).map((g) => ({
+            key: g,
+            label: groups[g].label,
+            value: summary.groups[g].rows,
+            detail: `${plural(summary.groups[g].rows, 'project')} · ${groupAmount(g, summary.groups[g])}`,
+            className: `g-${g}`,
+            active: status === g,
+            onClick: () => setParam('status', status === g ? '' : g),
+          }))}
+          legend={false}
+        />
         <div className="groups" role="group" aria-label="Filter by status">
-          {BRIDGE_GROUPS.map((g) => {
+          {BRIDGE_GROUPS.filter((g) => summary.groups[g].rows).map((g) => {
             const cell = summary.groups[g];
             const info = groups[g];
             const active = status === g;
@@ -187,19 +220,18 @@ function Projects({ scope, datasets }: { scope: ScopeResult; datasets: DatasetIn
                 key={g}
                 type="button"
                 className={`group-tile${active ? ' active' : ''}`}
-                disabled={!cell.rows}
                 aria-pressed={active}
                 title={info.help}
                 onClick={() => setParam('status', active ? '' : g)}
               >
                 <span className="group-label"><span className={`status-dot g-${g}`} aria-hidden="true" />{info.label}</span>
-                {info.sub && <span className="label">{info.sub}</span>}
                 <span className="group-count num">{count(cell.rows)}</span>
                 <span className="group-php num">{groupAmount(g, cell)}</span>
               </button>
             );
           })}
         </div>
+        <p className="fine">“House bill only” and “NEP only” are leads to check, not confirmed changes.</p>
       </section>
 
       <section className="section" id="projects" aria-labelledby="list-h">
@@ -227,15 +259,6 @@ function Projects({ scope, datasets }: { scope: ScopeResult; datasets: DatasetIn
             </label>
           )}
           <label className="field">
-            <span className="label">Program</span>
-            <select value={program} onChange={(e) => setParam('program', e.target.value)}>
-              <option value="">All programs</option>
-              {(Object.keys(summary.byDataset) as DatasetKey[]).map((k) => (
-                <option key={k} value={k}>{programName(k)} ({count(summary.byDataset[k]!.rows)})</option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
             <span className="label">Status</span>
             <select value={status} onChange={(e) => setParam('status', e.target.value)}>
               <option value="">Any status</option>
@@ -244,30 +267,46 @@ function Projects({ scope, datasets }: { scope: ScopeResult; datasets: DatasetIn
               ))}
             </select>
           </label>
-          {offices.length > 1 && (
+        </div>
+        <details className="more-filters" open={Boolean(program || office || why || params.get('sort'))}>
+          <summary>More filters and sorting</summary>
+          <div className="toolbar">
             <label className="field">
-              <span className="label">DPWH office</span>
-              <select value={office} onChange={(e) => setParam('office', e.target.value)}>
-                <option value="">Any office</option>
-                {offices.map(([o, n]) => <option key={o} value={o}>{shortOffice(o)} ({count(n)})</option>)}
+              <span className="label">Program</span>
+              <select value={program} onChange={(e) => setParam('program', e.target.value)}>
+                <option value="">All programs</option>
+                {(Object.keys(summary.byDataset) as DatasetKey[]).map((k) => (
+                  <option key={k} value={k}>{programName(k)} ({count(summary.byDataset[k]!.rows)})</option>
+                ))}
               </select>
             </label>
-          )}
-          {reasons.length > 1 && (
+            {offices.length > 1 && (
+              <label className="field">
+                <span className="label">DPWH office</span>
+                <select value={office} onChange={(e) => setParam('office', e.target.value)}>
+                  <option value="">Any office</option>
+                  {offices.map(([o, n]) => <option key={o} value={o}>{shortOffice(o)} ({count(n)})</option>)}
+                </select>
+              </label>
+            )}
+            {reasons.length > 1 && (
+              <label className="field">
+                <span className="label">Listed because</span>
+                <select value={why} onChange={(e) => setParam('why', e.target.value)}>
+                  <option value="">Any reason</option>
+                  {reasons.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                </select>
+              </label>
+            )}
             <label className="field">
-              <span className="label">Listed because</span>
-              <select value={why} onChange={(e) => setParam('why', e.target.value)}>
-                <option value="">Any reason</option>
-                {reasons.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+              <span className="label">Sort by</span>
+              <select value={sort} onChange={(e) => setParam('sort', e.target.value === 'house' ? '' : e.target.value)}>
+                {(Object.keys(SORTS) as Sort[]).map((k) => <option key={k} value={k}>{SORTS[k].label}</option>)}
               </select>
             </label>
-          )}
-          <label className="field">
-            <span className="label">Sort by</span>
-            <select value={sort} onChange={(e) => setParam('sort', e.target.value === 'house' ? '' : e.target.value)}>
-              {(Object.keys(SORTS) as Sort[]).map((k) => <option key={k} value={k}>{SORTS[k].label}</option>)}
-            </select>
-          </label>
+          </div>
+        </details>
+        <div>
         </div>
 
         {narrowed && (
@@ -297,6 +336,8 @@ function Projects({ scope, datasets }: { scope: ScopeResult; datasets: DatasetIn
           and the House bill are two versions of one budget: their totals are compared, never added.
         </p>
       </section>
+
+      <OfficesSection />
 
       <Disclaimers items={disclaimers} compact />
     </>
@@ -342,63 +383,94 @@ function tilesOf(config: PortalConfig, all: ScopedProject[], areas: Map<string, 
   return tiles.filter((t) => t.kind !== 'neighbour' || t.rows);
 }
 
-/** The bars compare barangays with each other, so only barangay tiles have one. */
-function areaMax(tiles: AreaTile[]): number {
-  return Math.max(1, ...tiles.filter((t) => t.kind === 'barangay').map((t) => t.house_php));
+/** Barangay named, none named, or a neighbour: each project is in exactly one, so these add up. */
+function whereOf(all: ScopedProject[], areas: Map<string, Area>, tiles: AreaTile[]) {
+  const parts = [
+    { key: '', label: 'Names a barangay', kind: 'barangay', rows: 0, house_php: 0 },
+    ...tiles.filter((t) => t.kind !== 'barangay').map((t) => ({ key: t.key, label: t.label, kind: t.kind as string, rows: 0, house_php: 0 })),
+  ];
+  for (const p of all) {
+    const a = areas.get(p.key)!;
+    const part = a.barangays.length ? parts[0] : parts.find((x) => x.key === areaKeys(a)[0]);
+    if (!part) continue;
+    part.rows++;
+    part.house_php += p.house_php ?? 0;
+  }
+  return parts.filter((x) => x.rows);
 }
 
-function Lede({ summary, shared, name }: { summary: Summary; shared: AreaTile[]; name: string }) {
-  const added = summary.groups.house_only.rows;
-  const dropped = summary.groups.nep_only.rows;
+interface Part { key: string; label: string; value: number; detail: string; className: string; active?: boolean; onClick?: () => void }
+
+/**
+ * One whole split into parts, widths in proportion. A part prints its number
+ * only when it is wide enough to hold it; the legend carries every number.
+ */
+function Segments({ label, parts, legend = true }: { label: string; parts: Part[]; legend?: boolean }) {
+  const total = parts.reduce((a, x) => a + x.value, 0) || 1;
   return (
-    <p>
-      {shared.map((t) => (
-        <span key={t.key}>
-          {name} shares its DPWH office with {t.label}, so {count(t.rows)} of these are {t.label} projects.{' '}
-        </span>
-      ))}
-      The NEP lists {count(summary.nep.rows)} of them, for {php(summary.nep.php)}; the House bill lists{' '}
-      {count(summary.house.rows)}, for {php(summary.house.php)}.{' '}
-      {added || dropped ? (
-        <>
-          {plural(added, 'project is', 'projects are')} in the House bill only and {count(dropped)} in the NEP only: candidates
-          to check, not confirmed changes.
-        </>
-      ) : (
-        <>Every project is in both.</>
+    <>
+      <div className="segs" role="group" aria-label={label}>
+        {parts.map((x) => {
+          const share = x.value / total;
+          const inner = share >= 0.06 ? <span className="num">{count(x.value)}</span> : null;
+          const props = { className: `seg ${x.className}${x.active ? ' active' : ''}`, style: { flexGrow: x.value }, title: `${x.label}: ${x.detail}` };
+          return x.onClick ? (
+            <button key={x.key} type="button" aria-pressed={Boolean(x.active)} aria-label={`${x.label}: ${x.detail}`} onClick={x.onClick} {...props}>{inner}</button>
+          ) : (
+            <span key={x.key} {...props}>{inner}</span>
+          );
+        })}
+      </div>
+      {legend && (
+        <ul className="seg-legend">
+          {parts.map((x) => (
+            <li key={x.key}>
+              <span className={`seg-key ${x.className}`} aria-hidden="true" />
+              <strong>{x.label}</strong> <span className="muted">{x.detail}</span>
+            </li>
+          ))}
+        </ul>
       )}
-    </p>
+    </>
   );
 }
 
-function Stats({ summary, programName }: { summary: Summary; programName: (k: DatasetKey) => string }) {
-  const programs = (Object.entries(summary.byDataset) as [DatasetKey, { rows: number }][])
-    .sort((a, b) => b[1].rows - a[1].rows)
-    .map(([k, c]) => `${programName(k)} ${count(c.rows)}`)
-    .join(' · ');
+/** The two versions side by side on one scale, and the three counts a reader asks for first. */
+function Hero({ summary }: { summary: Summary }) {
+  const max = Math.max(1, summary.nep.php, summary.house.php);
+  const versions = [
+    { key: 'nep', label: 'NEP', sub: 'the President’s budget', php: summary.nep.php, rows: summary.nep.rows },
+    { key: 'house', label: 'House bill', sub: 'what the House passed', php: summary.house.php, rows: summary.house.rows },
+  ];
   return (
-    <dl className="stats">
-      <div>
-        <dt className="label">Projects</dt>
-        <dd className="stat num">{count(summary.rows)}</dd>
-        <dd className="stat-sub">{programs || 'none'}</dd>
+    <div className="hero">
+      <div className="hero-chart" role="img" aria-label={`NEP ${php(summary.nep.php)} on ${plural(summary.nep.rows, 'project')}; House bill ${php(summary.house.php)} on ${plural(summary.house.rows, 'project')}`}>
+        {versions.map((v) => (
+          <div className={`hero-row hero-${v.key}`} key={v.key} title={`${v.label}: ${phpFull(v.php)} on ${plural(v.rows, 'project')}`}>
+            <span className="hero-label"><strong>{v.label}</strong><span>{v.sub}</span></span>
+            <span className="hero-track"><span className="hero-fill" style={{ width: `${(v.php / max) * 100}%` }} /></span>
+            <span className="hero-value num">{php(v.php)}<span>{plural(v.rows, 'project')}</span></span>
+          </div>
+        ))}
+        <p className="fine">Two versions of one budget: compared, never added.</p>
       </div>
-      <div>
-        <dt className="label">NEP</dt>
-        <dd className="stat num">{php(summary.nep.php)}</dd>
-        <dd className="stat-sub">{plural(summary.nep.rows, 'project')} · the budget the President submits</dd>
-      </div>
-      <div>
-        <dt className="label">House bill</dt>
-        <dd className="stat num stat-accent">{php(summary.house.php)}</dd>
-        <dd className="stat-sub">{plural(summary.house.rows, 'project')} · compared with the NEP, not added</dd>
-      </div>
-      <div>
-        <dt className="label">In the House bill only</dt>
-        <dd className="stat num">{count(summary.groups.house_only.rows)}</dd>
-        <dd className="stat-sub">{php(summary.groups.house_only.house_php)} · insertion candidates</dd>
-      </div>
-    </dl>
+      <dl className="hero-stats">
+        <div>
+          <dt className="label">Projects</dt>
+          <dd className="stat num">{count(summary.rows)}</dd>
+        </div>
+        <div>
+          <dt className="label">In the House bill only</dt>
+          <dd className="stat num stat-accent">{count(summary.groups.house_only.rows)}</dd>
+          <dd className="stat-sub">{php(summary.groups.house_only.house_php)}</dd>
+        </div>
+        <div>
+          <dt className="label">In the NEP only</dt>
+          <dd className="stat num">{count(summary.groups.nep_only.rows)}</dd>
+          <dd className="stat-sub">{php(summary.groups.nep_only.nep_php)}</dd>
+        </div>
+      </dl>
+    </div>
   );
 }
 
@@ -416,7 +488,7 @@ function ProjectTable({ rows, programName, areas }: { rows: ScopedProject[]; pro
       {rows.map((p) => (
         <div className="tr" role="row" key={p.key}>
           <span role="cell" className="td-project">
-            <Link to={`/projects/${p.dataset}/${encodeURIComponent(p.id)}`} className="project-title">{p.title}</Link>
+            <Link to={`/projects/${p.dataset}/${encodeURIComponent(p.id)}`} className="project-title" title={p.title}>{p.title}</Link>
             <span className="project-meta">
               <span className="label">{programName(p.dataset)}</span>
               {p.office && <span>{shortOffice(p.office)}</span>}

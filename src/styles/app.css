@@ -166,33 +166,89 @@
 .tier-B, .tier-mixed { border-color: #e2b45c; color: #7a5410; background: #fff8e8; }
 .tag-area { border-color: #b9cdf7; color: var(--accent-deep); background: var(--accent-soft); font-weight: 600; }
 
-/* Barangay tiles: one per barangay, so a reader finds their own at a glance. */
-.areas { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
-.area-tile {
-  display: flex; flex-direction: column; gap: 4px; text-align: left;
-  padding: 14px 16px 13px; min-height: 44px;
-  border: 1px solid var(--rule); border-radius: 10px; background: var(--paper);
-  font: inherit; color: inherit; cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+/* ---------- Charts ---------- */
+.chart-sub { margin: -4px 0 14px; font-size: 14px; color: var(--ink-3); }
+.chart-h { font-family: var(--font-hero); font-weight: 700; font-size: 15px; margin: 26px 0 8px; }
+
+/* Hero: the two versions on one scale, with the first three counts beside them. */
+.hero { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 32px; align-items: center; margin: 0 0 44px; padding: 22px 0; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--rule); }
+.hero-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 7px 0; }
+.hero-label { display: flex; flex-direction: column; line-height: 1.25; }
+.hero-label strong { font-family: var(--font-hero); font-size: 16px; }
+.hero-label span { font-size: 12.5px; color: var(--ink-3); }
+.hero-track { display: block; height: 24px; }
+.hero-fill { display: block; height: 100%; border-radius: 0 4px 4px 0; background: var(--bar-quiet); }
+.hero-house .hero-fill { background: var(--accent); }
+.hero-value { font-family: var(--font-hero); font-weight: 700; font-size: 24px; letter-spacing: -0.01em; min-width: 104px; line-height: 1.15; }
+.hero-value span { display: block; font-family: var(--font-body); font-weight: 400; font-size: 12.5px; letter-spacing: 0; color: var(--ink-3); }
+.hero .fine { margin-top: 6px; }
+.hero-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; }
+.hero-stats > div { padding: 0 16px; border-left: 1px solid var(--rule); }
+.hero-stats dd { margin: 0; }
+
+/* Ranked bars: one row per barangay, the value at the tip. A row is a filter. */
+:root { --bar-quiet: #8792a6; }
+.rank { display: flex; flex-direction: column; }
+.rk-row {
+  display: grid; grid-template-columns: 130px minmax(0, 1fr) 84px 92px; gap: 12px; align-items: center;
+  padding: 7px 8px; margin: 0 -8px; min-height: 40px; text-align: left;
+  border: 0; border-radius: 6px; background: none; font: inherit; color: inherit; cursor: pointer;
 }
-.area-tile:hover:not(:disabled) { border-color: var(--accent); box-shadow: 0 4px 14px rgba(11, 79, 217, 0.12); transform: translateY(-1px); }
-.area-tile.active { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
-.area-tile:disabled { cursor: default; color: var(--ink-mute); background: var(--paper-2); border-style: dashed; }
-.area-none, .area-neighbour { background: var(--paper-2); }
-.area-name { font-family: var(--font-hero); font-weight: 700; font-size: 17px; line-height: 1.2; }
-.area-count { font-size: 13.5px; color: var(--ink-2); }
-.area-tile:disabled .area-count { color: var(--ink-mute); }
-.area-bar { display: block; height: 4px; border-radius: 2px; background: var(--rule-soft); margin: 6px 0 2px; overflow: hidden; }
-.area-bar > span { display: block; height: 100%; min-width: 2px; border-radius: 2px; background: var(--accent); }
-.area-tile:disabled .area-bar > span { display: none; }
-.area-php { font-size: 12.5px; color: var(--ink-3); margin-top: auto; }
-@media (prefers-reduced-motion: reduce) { .area-tile { transition: none; } .area-tile:hover:not(:disabled) { transform: none; } }
-@media (max-width: 560px) { .areas { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .area-tile { padding: 12px 12px 11px; } .area-name { font-size: 15.5px; } }
+.rk-row:hover:not(:disabled) { background: var(--paper-2); }
+.rk-row.active { background: var(--accent-soft); }
+.rk-row:disabled { cursor: default; color: var(--ink-mute); }
+.rk-name { font-family: var(--font-hero); font-weight: 700; font-size: 15px; }
+.rk-track { display: block; height: 16px; border-left: 1px solid var(--rule); }
+.rk-fill { display: block; height: 100%; min-width: 2px; border-radius: 0 4px 4px 0; background: var(--accent); transition: background-color 0.15s; }
+.rk-row.dim .rk-fill { background: var(--bar-quiet); }
+.rk-value { font-weight: 600; font-size: 14px; text-align: right; }
+.rk-count { font-size: 12.5px; color: var(--ink-3); }
+.rk-row:disabled .rk-count { color: var(--ink-mute); }
+
+/* Segmented bar: one whole split into parts, a 2px gap between them. */
+.segs { display: flex; gap: 2px; height: 28px; }
+.seg {
+  flex: 1 1 0; min-width: 6px; display: flex; align-items: center; padding: 0;
+  border: 0; border-radius: 4px; font: inherit; font-size: 13px; font-weight: 600; color: #fff; overflow: visible; white-space: nowrap;
+}
+button.seg { cursor: pointer; }
+.seg > span { padding: 0 8px; }
+button.seg:hover, .seg.active { outline: 2px solid var(--ink); outline-offset: 1px; }
+.seg-barangay { background: var(--accent); }
+.seg-none { background: var(--ink-3); }
+.seg-neighbour { background: var(--bar-quiet); color: var(--ink); }
+.seg.g-unchanged, .seg.g-nep_only { color: var(--ink); }
+.seg.g-nep_only { background: var(--paper); }
+.seg-legend { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 10px 0 0; padding: 0; font-size: 13.5px; }
+.seg-legend li { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.seg-key { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+.more-filters { margin: 0 0 14px; }
+/* A title can run to a paragraph (one line lists twenty expressways); the project page has it in full. */
+.td-project .project-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+.more-filters > summary { cursor: pointer; font-size: 13.5px; color: var(--accent); width: fit-content; padding: 4px 0; }
+.more-filters .toolbar { margin-top: 10px; }
+
+@media (prefers-reduced-motion: reduce) { .rk-fill { transition: none; } }
+@media (max-width: 860px) {
+  .hero { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .hero-stats > div:first-child { padding-left: 0; border-left: 0; }
+}
+@media (max-width: 560px) {
+  .hero-row { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; }
+  .hero-track { grid-column: 1 / -1; grid-row: 2; height: 18px; }
+  .hero-value { font-size: 20px; min-width: 0; text-align: right; }
+  .hero-stats > div { padding: 0 10px; }
+  .hero-stats .stat { font-size: 26px; }
+  .rk-row { grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; padding: 8px; }
+  .rk-track { grid-column: 1 / -1; grid-row: 2; height: 12px; }
+  .rk-count { grid-column: 1 / -1; grid-row: 3; }
+}
 
 .reasons { display: inline-flex; gap: 4px; flex-wrap: wrap; }
 
 /* ---------- Group tiles ---------- */
-.groups { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; border-top: 1px solid var(--ink); }
+.groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0; margin-top: 12px; }
 .group-tile {
   display: flex;
   flex-direction: column;
